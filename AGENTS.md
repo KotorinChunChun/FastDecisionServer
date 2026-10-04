@@ -23,3 +23,4 @@
 | 現版の要求・実装 | [要求](dev/history/v0.1.0/v0.1.0-req.md)、[実装](dev/history/v0.1.0/v0.1.0-imp.md) |
 | 測定・検証 | [検証結果](dev/testing/v0.1.0-results.md) |
 | 配布方針 | [配布規則](dev/RELEASE_RULE.md) |
+モデル常駐管理・解放承認・CPU/GPU切替: [実装と統合確認](dev/history/v0.2.0/v0.2.0-imp.md)、[API](docs/DEVELOPERS_GUIDE.md)。
