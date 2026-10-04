@@ -20,6 +20,6 @@
 |---|---|
 | 利用方法 | [README](README.md) |
 | 構築・API・モデル追加 | [開発者ガイド](docs/DEVELOPERS_GUIDE.md) |
-| 現版の要求・実装 | [要求](dev/v0.1.0-req.md)、[実装](dev/v0.1.0-imp.md) |
+| 現版の要求・実装 | [要求](dev/history/v0.1.0/v0.1.0-req.md)、[実装](dev/history/v0.1.0/v0.1.0-imp.md) |
 | 測定・検証 | [検証結果](dev/testing/v0.1.0-results.md) |
 | 配布方針 | [配布規則](dev/RELEASE_RULE.md) |
