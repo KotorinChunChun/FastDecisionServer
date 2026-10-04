@@ -43,7 +43,7 @@ class ConfigurationTests(unittest.TestCase):
 
 
     def test_model_management_and_memory_estimates_are_validated(self):
-        for policy in [{"allow_load": "yes"}, {"allow_unload": 1}, {"max_loaded_models": 0},
+        for policy in [{"allow_load": "yes"}, {"allow_unload": 1}, {"allow_auto_unload": "false"}, {"max_loaded_models": 0},
                        {"ram_reserve_mb": -1}, {"vram_reserve_mb": True}, {"approval_ttl_seconds": 0},
                        {"unknown": True}]:
             with self.subTest(policy=policy), self.assertRaises(ValueError):
@@ -59,7 +59,9 @@ class ConfigurationTests(unittest.TestCase):
         value = self.configured({"model_management": {"allow_load": False}})
         self.assertFalse(value["model_management"]["allow_load"])
         self.assertTrue(value["model_management"]["allow_unload"])
-        self.assertEqual(value["model_management"]["max_loaded_models"], 3)
+        self.assertEqual(value["model_management"]["max_loaded_models"], 6)
+        self.assertFalse(value["model_management"]["allow_auto_unload"])
+        self.assertTrue(self.configured({"model_management": {"allow_auto_unload": True}})["model_management"]["allow_auto_unload"])
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """実モデルを使わず、容量計画・承認・LRU・失敗時の常駐維持を検証する。"""
 import unittest
 
-from fds.management import ManagementError, Resident, ResidentModels
+from fds.management import DEFAULT_POLICY, ManagementError, Resident, ResidentModels
 
 
 class ManagementTests(unittest.TestCase):
@@ -10,7 +10,7 @@ class ManagementTests(unittest.TestCase):
         self.loaded_calls = []
         self.failure = None
         self.manager = ResidentModels({"model_management": {
-            "ram_reserve_mb": 100, "vram_reserve_mb": 100, "max_loaded_models": 3
+            "ram_reserve_mb": 100, "vram_reserve_mb": 100, "max_loaded_models": 3, "allow_auto_unload": True
         }}, self.load_model, lambda: None, self.memory)
         self.estimate = {"ram": 1000, "vram": 0}
 
@@ -176,6 +176,55 @@ class ManagementTests(unittest.TestCase):
         self.error("insufficient_capacity", lambda: self.load("b", token=token))
         self.assertEqual(self.loaded_calls, [("a", "cpu")])
         self.assertFalse(self.manager.snapshot()["ready"])
+
+    def test_default_policy_keeps_all_three_models_on_both_devices_and_reuses_them(self):
+        self.manager.policy = dict(DEFAULT_POLICY)
+        for name in ("a", "b", "c"):
+            for device in ("cpu", "cuda"):
+                self.assertEqual(self.load(name, device)["unloaded"], [])
+        before = {key: value.model for key, value in self.manager.entries.items()}
+        self.assertEqual(len(before), 6)
+        for key in reversed(list(before)):
+            result = self.load(*key)
+            self.assertEqual(result["unloaded"], [])
+            self.assertEqual(result["generation"], 6)
+            self.assertIs(self.manager.entries[key].model, before[key])
+        self.assertEqual(len(self.loaded_calls), 6)
+
+    def test_server_retention_overrides_client_permission_for_count_ram_and_vram(self):
+        self.manager.policy = dict(DEFAULT_POLICY)
+        self.load("a", "cuda")
+        before = self.manager.snapshot()
+        for resource in ("count", "ram", "vram"):
+            with self.subTest(resource=resource):
+                self.manager.policy["max_loaded_models"] = 1 if resource == "count" else 6
+                self.manager.memory = lambda device: {"ram": 500 if resource == "ram" else 20000,
+                                                      "vram": 500 if resource == "vram" else 20000}
+                error = self.error("insufficient_capacity", lambda: self.load("b", "cuda", auto_unload=True))
+                self.assertEqual(error.status, 409)
+                self.assertIsNone(error.approval)
+                self.assertIn("既存モデルを保持", str(error))
+                self.assertEqual(self.manager.snapshot()["loaded_models"], before["loaded_models"])
+                self.assertEqual(self.manager.generation, before["generation"])
+        self.assertEqual(len(self.loaded_calls), 1)
+
+    def test_previous_load_approval_cannot_override_server_retention(self):
+        self.manager.policy["max_loaded_models"] = 1
+        self.load("a")
+        token = self.approval(lambda: self.load("b"))["token"]
+        self.manager.policy["allow_auto_unload"] = False
+        self.error("insufficient_capacity", lambda: self.load("b", token=token))
+        self.assertEqual(list(self.manager.entries), [("a", "cpu")])
+        self.assertEqual(len(self.loaded_calls), 1)
+
+    def test_retention_still_allows_explicit_unload_only_with_approval(self):
+        self.manager.policy = dict(DEFAULT_POLICY)
+        self.load("a")
+        approval = self.approval(lambda: self.manager.unload(("a", "cpu")))
+        self.assertEqual(list(self.manager.entries), [("a", "cpu")])
+        result = self.manager.unload(("a", "cpu"), approval["token"])
+        self.assertEqual(result["unloaded"], [{"model": "a", "device": "cpu"}])
+        self.assertFalse(self.manager.entries)
 
 
 if __name__ == "__main__":

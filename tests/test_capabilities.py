@@ -14,6 +14,8 @@ class CapabilitiesTest(unittest.TestCase):
             with patch('torch.cuda.is_available',return_value=False):
                 result=backend.capabilities()
                 self.assertEqual(result['devices'],['auto','cpu'])
+                self.assertFalse(result['model_management']['allow_auto_unload'])
+                self.assertEqual(result['model_management']['max_loaded_models'], 6)
                 self.assertTrue(result['models'][0]['available'])
                 self.assertFalse(result['models'][1]['available'])
                 self.assertEqual(result['models'][1]['devices'],[])

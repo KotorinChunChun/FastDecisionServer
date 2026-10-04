@@ -9,7 +9,7 @@ import time
 
 
 DEFAULT_POLICY = {
-    "allow_load": True, "allow_unload": True, "max_loaded_models": 3,
+    "allow_load": True, "allow_unload": True, "allow_auto_unload": False, "max_loaded_models": 6,
     "ram_reserve_mb": 2048, "vram_reserve_mb": 1024, "approval_ttl_seconds": 120,
 }
 
@@ -91,8 +91,16 @@ class ResidentModels:
                     and all(free[r] >= estimate[r] + reserves[r] for r in resources))
         if enough():
             return victims
-        if not auto_unload:
-            raise ManagementError("insufficient_capacity", "空き容量または常駐上限が不足しています。自動アンロードは無効です。")
+        if not auto_unload or not self.policy["allow_auto_unload"]:
+            shortages = []
+            if len(self.entries) >= self.policy["max_loaded_models"]:
+                shortages.append(f"常駐上限{self.policy['max_loaded_models']}件")
+            for resource in resources:
+                if free[resource] < estimate[resource] + reserves[resource]:
+                    shortages.append(f"{resource.upper()}空き{free[resource]:.0f}MiB / 必要{estimate[resource] + reserves[resource]:.0f}MiB")
+            source = "サーバー" if not self.policy["allow_auto_unload"] else "要求"
+            raise ManagementError("insufficient_capacity",
+                                  f"既存モデルを保持したまま追加ロードできません（{'、'.join(shortages)}）。{source}で自動アンロードを無効にしています。")
         if not self.policy["allow_unload"]:
             raise ManagementError("unload_not_allowed", "サーバーがアンロードを許可していないため追加ロードできません。", 403)
         for candidate, resident in self.entries.items():

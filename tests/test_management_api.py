@@ -16,7 +16,7 @@ class ManagedBackend(ControlledBackend):
     def __init__(self):
         super().__init__()
         self.config = copy.deepcopy(CONFIG)
-        self.manager = ResidentModels({"model_management": {"max_loaded_models": 1, "ram_reserve_mb": 0}},
+        self.manager = ResidentModels({"model_management": {"max_loaded_models": 1, "ram_reserve_mb": 0, "allow_auto_unload": True}},
                                       self.create_model, lambda: None,
                                       lambda device: {"ram": 100000, "vram": 100000})
         self.load_failure = False
@@ -120,6 +120,22 @@ class ManagementApiTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.post("/v1/decisions", json=body | {"approval_token": token})
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(len(self.backend.calls), 1)
+
+    async def test_retention_is_advertised_and_cannot_be_bypassed_by_load_or_inference(self):
+        self.backend.manager.policy["allow_auto_unload"] = False
+        before = self.backend.manager.snapshot()
+        for path in ("/health", "/models", "/v1/models"):
+            state = (await self.client.get(path)).json()
+            self.assertFalse(state["model_management"]["allow_auto_unload"])
+        for path, body in (("/models/load", {"model": "image-model", "device": "cuda"}),
+                           ("/v1/decisions", payload(model="image-model", device="cuda"))):
+            response = await self.client.post(path, json=body | {"auto_unload": True})
+            self.assertEqual(response.status_code, 409, response.text)
+            self.assertEqual(response.json()["detail"]["code"], "insufficient_capacity")
+            self.assertNotIn("approval", response.json()["detail"])
+            self.assertEqual(self.backend.manager.snapshot(), before)
+        response = await self.client.post("/v1/decisions", json=payload(model="text-model", device="cpu"))
+        self.assertEqual(response.status_code, 200, response.text)
 
     async def test_policy_and_invalid_management_are_distinguishable(self):
         self.backend.manager.policy["allow_load"] = False

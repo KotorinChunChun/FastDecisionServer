@@ -155,3 +155,11 @@ CPU側はRAM、GPU側はVRAMとロード時などのRAMを必要とし、公開�
 起動時の既定モデル準備はサーバー自身の処理としてロード許可に依存しない。クライアントの追加ロードは許可に従う。ロード禁止でも常駐再利用は許可される。アンロード禁止なら自動追放と明示解放の両方を拒否する。
 
 常駐管理を実装するバックエンドは既存の `warmup/decide/loaded` に加えて `manage(action, ModelOperation)/status()/capabilities()` を持つ。モデル本体・max_optionsはエントリーごとに保持する。変更は単一ワーカー、一覧の読み取りは短いロックによるスナップショットで行う。承認確認・token消費・解放・ロードは同じジョブ中で行い、期限切れ後も実処理終了まで実行枠を保持する。
+
+## v0.2.2 自動解放禁止と常駐保持
+
+`model_management.allow_auto_unload` は真偽値、既定false。`max_loaded_models`の既定は6（範囲1～32）へ変更した。通常推論と明示ロードの両方で、要求の`auto_unload`とサーバーの`allow_auto_unload`の両方がtrueの場合だけLRU解放を検討する。既存の常駐再利用と空きへの追加ロードにはこの許可を必要としない。
+
+サーバーの自動解放禁止は、要求のauto_unloadや古いapproval_tokenでは上書きできない。容量不足時は409 `insufficient_capacity`（approvalなし）を返し、既存モデル・generationを保持する。メッセージには不足したRAM/VRAMの空きと必要量（余裕込み）、または常駐件数の上限を含める。healthとmodelsのmodel_managementにもallow_auto_unloadを返す。
+
+`allow_unload`は明示解放の許可として維持する。allow_auto_unload=falseでも、allow_unload=trueなら承認付きの手動アンロードは可能。両方trueに設定した場合のLRU・解放承認の契約はv0.2.0のまま。GPU/CPU用は別実体なのでそれぞれのメモリを消費し、常駐上限6は物理容量への収容保証ではない。設定の反映はFDS再起動後となる。

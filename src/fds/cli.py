@@ -38,7 +38,7 @@ def configuration(root):
     if not isinstance(policy, dict) or set(policy) - set(DEFAULT_POLICY):
         raise ValueError("model_managementの設定が不正です。")
     policy = DEFAULT_POLICY | policy
-    for key in ("allow_load", "allow_unload"):
+    for key in ("allow_load", "allow_unload", "allow_auto_unload"):
         if type(policy[key]) is not bool:
             raise ValueError(f"{key}は真偽値で指定してください。")
     for key, lower, upper in [("max_loaded_models", 1, 32), ("ram_reserve_mb", 0, 1048576),

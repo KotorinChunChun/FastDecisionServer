@@ -64,10 +64,11 @@
   },
   "model_management": {
     "allow_load": true,
-    "max_loaded_models": 3,
+    "max_loaded_models": 6,
     "approval_ttl_seconds": 120,
     "allow_unload": true,
     "vram_reserve_mb": 1024,
-    "ram_reserve_mb": 2048
+    "ram_reserve_mb": 2048,
+    "allow_auto_unload": false
   }
 }
