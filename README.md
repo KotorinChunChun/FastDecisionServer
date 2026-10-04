@@ -42,3 +42,8 @@ Invoke-RestMethod http://127.0.0.1:8767/v1/decisions -Method Post -ContentType '
 モデルは `config.json` へ登録したIDから選び、要求ごとにモデルとdeviceを固定します。待ち列は既定16件、満杯は429。`interactive`、`normal`、`background` の順に待ち要求を処理し、同順位は受付順です。実行中の要求には割り込みません。
 
 [構築・API・モデル追加](docs/DEVELOPERS_GUIDE.md) / [検証結果](dev/testing/v0.1.0-results.md)
+## ソースと連携状況
+
+ソースは [private GitHub](https://github.com/KotorinChunChun/FastDecisionServer) に保存しています。2026-10-04、共通アプリ一覧とDevLauncherの原本へ登録済みです。ランチャー配布版への反映は別工程です。
+
+DesktopAgent v0.17.0で6用途のJeff/Luna切替へ接続しました。合成日本語26件では、不確かな判定をLunaへ切り替える既定構成が25/26、Luna固定が26/26でした。24件でLunaへの切替が必要で、アプリ全体の高速化は確認できていません。単純な猫・図形のスモーク速度を日本語全般の品質保証として扱わないでください。詳細はDesktopAgentの dev/testing/v0.17.0-results.md を参照してください。
