@@ -152,6 +152,8 @@ def create_app(config, backend, control_token="", shutdown=None):
 
     @app.get("/v1/models")
     async def models():
+        if hasattr(backend,"capabilities"):
+            return await asyncio.to_thread(backend.capabilities)
         return {"models": [{"id": k, "name": v["name"], "revision": v["revision"],
                             "modalities": ["text", "image"] if v.get("images") else ["text"],
                             "devices": ["auto", "cpu", "cuda"], "backend": v.get("backend", "jeff")}

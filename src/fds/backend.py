@@ -14,6 +14,30 @@ class JeffBackend:
         self.model = None
         self.loaded = None
 
+    def capabilities(self):
+        import torch
+        cuda = torch.cuda.is_available()
+        server_devices = ['cpu'] + (['cuda'] if cuda else [])
+        automatic = self.config.get('default_device','auto')
+        auto_supported = automatic != 'cuda' or cuda
+        rows=[]
+        for ident,entry in self.config['models'].items():
+            folder=self.root / entry['checkpoint']
+            try:
+                marker=folder / '.fds-revision'
+                installed=(folder / 'decision_config.json').is_file() and marker.is_file() and marker.read_text(encoding='utf-8').strip()==entry['revision'] and any(folder.glob('*.safetensors'))
+            except OSError:
+                installed=False
+            supported=entry.get('backend','jeff')=='jeff'
+            available=bool(installed and supported)
+            rows.append({'id':ident,'name':entry['name'],'revision':entry['revision'],
+                         'modalities':['text','image'] if entry.get('images') else ['text'],
+                         'backend':entry.get('backend','jeff'),'installed':bool(installed),'available':available,
+                         'unavailable_reason':None if available else 'モデル未導入または固定版不一致' if not installed else '未対応バックエンド',
+                         'devices':(['auto'] if auto_supported else [])+server_devices if available else []})
+        return {'models':rows,'devices':(['auto'] if auto_supported else [])+server_devices,
+                'default_device':automatic,'capabilities_version':1}
+
     def _load(self, name, requested_device):
         import torch
         from jeff.models import load_decision_model

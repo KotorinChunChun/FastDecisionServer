@@ -47,3 +47,7 @@ Invoke-RestMethod http://127.0.0.1:8767/v1/decisions -Method Post -ContentType '
 ソースは [private GitHub](https://github.com/KotorinChunChun/FastDecisionServer) に保存しています。2026-10-04、共通アプリ一覧とDevLauncherの原本へ登録済みです。ランチャー配布版への反映は別工程です。
 
 DesktopAgent v0.17.0で6用途のJeff/Luna切替へ接続しました。合成日本語26件では、不確かな判定をLunaへ切り替える既定構成が25/26、Luna固定が26/26でした。24件でLunaへの切替が必要で、アプリ全体の高速化は確認できていません。単純な猫・図形のスモーク速度を日本語全般の品質保証として扱わないでください。詳細はDesktopAgentの dev/testing/v0.17.0-results.md を参照してください。
+
+## クライアント用の利用可否
+
+`GET /v1/models` は `installed`、`available`、`unavailable_reason` と、現在のサーバーで利用できる `devices` を返します。トップレベルにも `devices` と `capabilities_version: 1` を返します。未導入モデルは一覧に残し `available: false`、devicesは空配列です。GPUはサーバーのCUDA利用可否で判定し、クライアントPCのGPUとは無関係です。導入確認は設定・固定revision・重みファイルの存在によるもので、メモリ不足や破損ファイルまで成功を保証するものではありません。
