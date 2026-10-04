@@ -24,3 +24,5 @@
 | 測定・検証 | [検証結果](dev/testing/v0.1.0-results.md) |
 | 配布方針 | [配布規則](dev/RELEASE_RULE.md) |
 モデル常駐管理・解放承認・CPU/GPU切替: [実装と統合確認](dev/history/v0.2.0/v0.2.0-imp.md)、[API](docs/DEVELOPERS_GUIDE.md)。
+
+登録済み3モデルの導入・日本語判定確認（2026-10-04）: [導入記録](dev/testing/model-install-20261004.md)。
