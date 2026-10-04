@@ -25,7 +25,7 @@ def configuration(root):
     if value["default_model"] not in value["models"]:
         raise ValueError("既定モデルが未登録です。")
     for name, entry in value["models"].items():
-        if not re.fullmatch(r"[a-zA-Z0-9_-]{1,100}", name) or not re.fullmatch(r"[a-fA-F0-9]{40}", entry["revision"]):
+        if not re.fullmatch(r"[a-zA-Z0-9_.-]{1,100}", name) or not re.fullmatch(r"[a-fA-F0-9]{40}", entry["revision"]):
             raise ValueError("モデルIDまたは固定revisionが不正です。")
         folder = (root / entry["checkpoint"]).resolve()
         if not folder.is_relative_to((root / "models").resolve()):
