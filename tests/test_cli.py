@@ -24,9 +24,16 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_invalid_service_bounds_are_rejected(self):
         for changes in [{"host": "0.0.0.0"}, {"default_device": "gpu"}, {"port": 0}, {"port": 65536},
-                        {"queue_size": 0}, {"cpu_threads": True}, {"default_model": "missing"}]:
+                        {"queue_size": 0}, {"cpu_threads": True}, {"default_model": "missing"},
+                        {"text_batch_size": 0}, {"text_batch_size": 9}, {"text_batch_size": True},
+                        {"text_batch_size": 2.5}]:
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 self.configured(changes)
+
+    def test_text_batch_size_defaults_and_serial_override(self):
+        self.sample.pop("text_batch_size", None)
+        self.assertEqual(self.configured()["text_batch_size"], 8)
+        self.assertEqual(self.configured({"text_batch_size": 1})["text_batch_size"], 1)
 
     def test_checkpoint_outside_models_is_rejected(self):
         self.sample["models"]["jeff-qwen-2b"]["checkpoint"] = "../outside"

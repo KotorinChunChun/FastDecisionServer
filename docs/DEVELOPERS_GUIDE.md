@@ -15,6 +15,8 @@ pwsh -NoProfile -File .\dev\scripts\setup.ps1 -Device cpu
 
 設定は `config.json`、ローカル上書きは Git 対象外の `config.local.json`。上書きはトップレベル単位（modelsは辞書全体）で適用する。`default_model`、`default_device`、`cpu_threads`（1～32）、`queue_size`（1～256）、`port`（1～65535）を検査する。初版のhostは127.0.0.1に固定する。
 
+`text_batch_size`（1～8、既定8）は1要求内で一緒に推論するテキスト質問数。paddingを含む入力が1024トークンを超える場合はforward前に分割する。長文1質問は従来どおり8192トークンまで、画像は常に1質問ずつ処理する。`text_batch_size: 1`で従来の逐次方式に戻せる。複数のHTTP要求を一緒に処理する設定ではなく、単一ワーカーと取消後の実処理保持は変わらない。
+
 ## API
 
 `GET /health` は ready/error、active/queued/completed、loaded=[model,device]、pid、default_model/default_device、acceptingを返す。readyは推論の準備完了を示し、モデルごとの品質を保証しない。
@@ -41,6 +43,8 @@ pwsh -NoProfile -File .\dev\scripts\setup.ps1 -Device cpu
 1説明は1000文字以内。HTTP本文は22MB以内。画像は1枚8MB/1600万画素、合計16MB。画像の実形式とdata URLのMIMEを照合する。推論の質問ごと8192トークンを超えた場合も切り捨てず拒否する。
 
 正常応答には `answers`（Jeff互換）、`model`、`revision`、`device`、`request_id`、`queue_ms`、`load_ms`、`inference_ms`、`total_ms`、`usage`、`provider` が含まれる。total_msは受付後のサーバー内時間、queue_msは準備待ちを含む待ち時間、load_msは要求で必要だったモデル準備時間、inference_msは質問の準備・各forward・CPUへの結果転送を含む。画像検証や周辺処理があるため各時間の単純な合計とは一致しない。
+
+v0.2.1では `execution.batch_sizes`（各forwardの質問数）、`execution.cpu_threads`（推論スレッドの実効値）、`execution.text_batch_token_limit`（複数質問のpadding込み上限）を追加。healthの `cpu_threads/text_batch_size` は設定値を返す。速度比較は同一モデルrevision・入力・実デバイス・スレッド数で行い、ロード・待ち列と推論時間を分ける。GPUのバッチ形状により浮動小数の確率差が生じることがあり、厳密な逐次再現が必要ならtext_batch_sizeを1にする。
 
 | HTTP | 意味 |
 |---|---|

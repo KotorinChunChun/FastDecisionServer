@@ -26,3 +26,5 @@
 モデル常駐管理・解放承認・CPU/GPU切替: [実装と統合確認](dev/history/v0.2.0/v0.2.0-imp.md)、[API](docs/DEVELOPERS_GUIDE.md)。
 
 登録済み3モデルの導入・日本語判定確認（2026-10-04）: [導入記録](dev/testing/model-install-20261004.md)。
+
+短文質問の一括推論・実行速度比較（v0.2.1）: [実装と再起動](dev/history/v0.2.1/v0.2.1-imp.md)、[測定と再現](dev/testing/v0.2.1-results.md)。同一モデルだけでなく入力・実デバイス・スレッド数を揃え、待ち列と推論を分けて比較する。

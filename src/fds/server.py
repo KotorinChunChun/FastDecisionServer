@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 
 from .contracts import DecisionRequest, ModelOperation
 from .management import ManagementError
+from . import __version__
 
 
 class DecisionService:
@@ -136,7 +137,7 @@ def create_app(config, backend, control_token="", shutdown=None):
         finally:
             await service.stop()
 
-    app = FastAPI(title="FastDecisionServer", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="FastDecisionServer", version=__version__, lifespan=lifespan)
     app.state.decisions = service
 
     @app.middleware("http")
@@ -165,7 +166,7 @@ def create_app(config, backend, control_token="", shutdown=None):
     @app.get("/health")
     async def health():
         state = backend.status() if hasattr(backend, "status") else {}
-        return {"service": "FastDecisionServer", "alias": "fds", "version": "0.2.0",
+        return {"service": "FastDecisionServer", "alias": "fds", "version": __version__,
                 "ready": state.get("ready", service.ready), "running": service.accepting,
                 "error": service.error or state.get("error"), "active": service.active, "queued": service.queue.qsize(),
                 "completed": service.completed, "loaded": state.get("loaded", backend.loaded), "pid": os.getpid(),
@@ -173,7 +174,8 @@ def create_app(config, backend, control_token="", shutdown=None):
                 "operation": state.get("operation") or service.operation,
                 "model_management": state.get("model_management", {}),
                 "default_model": config.get("default_model", "jeff-qwen-2b"),
-                "default_device": config.get("default_device", "auto"), "accepting": service.accepting}
+                "default_device": config.get("default_device", "auto"), "accepting": service.accepting,
+                "cpu_threads": config.get("cpu_threads", 4), "text_batch_size": config.get("text_batch_size", 8)}
 
     @app.get("/models")
     @app.get("/v1/models")

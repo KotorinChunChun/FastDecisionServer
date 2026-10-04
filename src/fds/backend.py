@@ -10,6 +10,9 @@ from .contracts import prepare_images
 from .management import ManagementError, Resident, ResidentModels
 
 
+TEXT_BATCH_TOKEN_LIMIT = 1024
+
+
 def free_memory_mb(device):
     """OS/CUDAの現在の空き。取得不能を架空の空き容量に置き換えない。"""
     if os.name == "nt":
@@ -182,20 +185,42 @@ class JeffBackend:
         resident = self.manager.entries[(request.model, device)]
         started = time.perf_counter()
         answers, tokens = {}, 0
+        questions = [(key, question.model_dump(exclude_none=True))
+                     for key, question in request.questions.items()]
+        for _, question in questions:
+            if question["type"] == "choice" and len(question["criteria"]) > resident.limit:
+                raise ValueError("選択肢がモデルの上限を超えました。")
+        batch_size = 1 if images else self.config.get("text_batch_size", 8)
+        batch_sizes = []
+        pending = [questions[start:start + batch_size] for start in range(0, len(questions), batch_size)]
+        pending.reverse()
         with torch.inference_mode():
-            for key, question in request.questions.items():
-                value = question.model_dump(exclude_none=True)
-                if question.type == "choice" and len(question.criteria) > resident.limit:
-                    raise ValueError("選択肢がモデルの上限を超えました。")
-                batch = resident.model.prepare([{"state": request.state, "question": value, "images": images}])
-                if batch.input_tokens > 8192:
+            while pending:
+                items = pending.pop()
+                rows = [{"state": request.state, "question": value, "images": images} for _, value in items]
+                # Jeff の各質問8192トークン制限と、プロンプト生成をそのまま使う。
+                batch = resident.model.prepare(rows, max_length=8192)
+                if len(items) > 1 and batch.inputs["input_ids"].numel() > TEXT_BATCH_TOKEN_LIMIT:
+                    # paddingを含む入力量が大きいときは、親のGPU入力を解放して再準備する。
+                    del batch
+                    midpoint = len(items) // 2
+                    pending.append(items[midpoint:])
+                    pending.append(items[:midpoint])
+                    continue
+                if len(items) == 1 and batch.input_tokens > 8192:
                     raise ValueError("モデル入力は1質問8192トークン以内にしてください。")
-                probabilities = (resident.model(batch) / resident.model.temperature).softmax(-1).cpu().tolist()[0][:batch.counts[0]]
-                if any(not math.isfinite(p) for p in probabilities):
-                    raise RuntimeError("モデルが不正な確率を返しました。")
-                answers[key] = answer(value, probabilities)
+                distributions = (resident.model(batch) / resident.model.temperature).softmax(-1).cpu().tolist()
+                batch_sizes.append(len(items))
+                for (key, value), distribution, count in zip(items, distributions, batch.counts, strict=True):
+                    probabilities = distribution[:count]
+                    if any(not math.isfinite(p) for p in probabilities):
+                        raise RuntimeError("モデルが不正な確率を返しました。")
+                    answers[key] = answer(value, probabilities)
                 tokens += batch.input_tokens
+                del batch
         return {"model": request.model, "revision": entry["revision"], "device": device,
                 "answers": answers, "load_ms": load_ms, "inference_ms": (time.perf_counter()-started)*1000,
                 "usage": {"input_tokens": tokens, "output_tokens": 0}, "provider": "fds",
+                "execution": {"batch_sizes": batch_sizes, "cpu_threads": torch.get_num_threads(),
+                              "text_batch_token_limit": TEXT_BATCH_TOKEN_LIMIT},
                 "management": management}

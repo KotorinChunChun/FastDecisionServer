@@ -20,7 +20,8 @@ def configuration(root):
         raise ValueError("初版の待受は127.0.0.1のみです。")
     if value["default_device"] not in ("auto", "cpu", "cuda"):
         raise ValueError("deviceが不正です。")
-    for key, lower, upper in [("cpu_threads", 1, 32), ("queue_size", 1, 256), ("port", 1, 65535)]:
+    value.setdefault("text_batch_size", 8)
+    for key, lower, upper in [("cpu_threads", 1, 32), ("text_batch_size", 1, 8), ("queue_size", 1, 256), ("port", 1, 65535)]:
         if type(value[key]) is not int or not lower <= value[key] <= upper:
             raise ValueError(f"{key}は{lower}～{upper}の整数を指定してください。")
     if value["default_model"] not in value["models"]:

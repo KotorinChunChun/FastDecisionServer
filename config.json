@@ -4,6 +4,7 @@
   "default_model": "jeff-qwen-2b",
   "default_device": "auto",
   "cpu_threads": 4,
+  "text_batch_size": 8,
   "queue_size": 16,
   "models": {
     "jeff-qwen-2b": {
