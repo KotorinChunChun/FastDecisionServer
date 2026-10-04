@@ -48,9 +48,19 @@ class Score(StrictModel):
         return self
 
 
+class ModelOperation(StrictModel):
+    model: str = Field(min_length=1, max_length=100)
+    device: Literal["auto", "cpu", "cuda"] = "auto"
+    auto_unload: bool = Field(default=True, strict=True)
+    approval_token: str | None = Field(default=None, min_length=20, max_length=256, repr=False)
+    timeout_seconds: int = Field(default=30, ge=1, le=300, strict=True)
+
+
 class DecisionRequest(StrictModel):
     model: str = Field(default="jeff-qwen-2b", min_length=1, max_length=100)
     device: Literal["auto", "cpu", "cuda"] = "auto"
+    auto_unload: bool = Field(default=True, strict=True)
+    approval_token: str | None = Field(default=None, min_length=20, max_length=256, repr=False)
     state: str = Field(max_length=24000)
     questions: dict[str, Annotated[Choice | Noul | Score, Field(discriminator="type")]] = Field(min_length=1, max_length=8)
     images: list[Annotated[str, Field(max_length=10_666_700)]] = Field(default_factory=list, max_length=4)

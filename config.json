@@ -6,8 +6,67 @@
   "cpu_threads": 4,
   "queue_size": 16,
   "models": {
-    "jeff-qwen-2b": {"backend":"jeff", "name":"Jeff Qwen3.5-2B", "repo":"mstrasser/Jeff-Qwen3.5-2B", "revision":"00448e884cce9e34396d8c72e9a692b41383b1ee", "checkpoint":"models/qwen-2b", "images":true},
-    "jeff-qwen-0.8b": {"backend":"jeff", "name":"Jeff Qwen3.5-0.8B", "repo":"mstrasser/Jeff-Qwen3.5-0.8B", "revision":"51552f39a943d62e8387c4ea5e17026a1408729f", "checkpoint":"models/qwen-0.8b", "images":true},
-    "jeff-gemma-e2b": {"backend":"jeff", "name":"Jeff Gemma4 E2B", "repo":"mstrasser/Jeff-Gemma4-E2B", "revision":"e3de3e99a979f92afd995d4e526c7e3170ae49cf", "checkpoint":"models/gemma-e2b", "images":false}
+    "jeff-qwen-2b": {
+      "backend": "jeff",
+      "name": "Jeff Qwen3.5-2B",
+      "repo": "mstrasser/Jeff-Qwen3.5-2B",
+      "revision": "00448e884cce9e34396d8c72e9a692b41383b1ee",
+      "checkpoint": "models/qwen-2b",
+      "images": true,
+      "memory_mb": {
+        "cuda": {
+          "vram": 6144,
+          "ram": 4096
+        },
+        "cpu": {
+          "vram": 0,
+          "ram": 8192
+        }
+      }
+    },
+    "jeff-qwen-0.8b": {
+      "backend": "jeff",
+      "name": "Jeff Qwen3.5-0.8B",
+      "repo": "mstrasser/Jeff-Qwen3.5-0.8B",
+      "revision": "51552f39a943d62e8387c4ea5e17026a1408729f",
+      "checkpoint": "models/qwen-0.8b",
+      "images": true,
+      "memory_mb": {
+        "cuda": {
+          "vram": 3072,
+          "ram": 2048
+        },
+        "cpu": {
+          "vram": 0,
+          "ram": 3072
+        }
+      }
+    },
+    "jeff-gemma-e2b": {
+      "backend": "jeff",
+      "name": "Jeff Gemma4 E2B",
+      "repo": "mstrasser/Jeff-Gemma4-E2B",
+      "revision": "e3de3e99a979f92afd995d4e526c7e3170ae49cf",
+      "checkpoint": "models/gemma-e2b",
+      "images": false,
+      "memory_mb": {
+        "cuda": {
+          "vram": 12288,
+          "ram": 8192
+        },
+        "cpu": {
+          "vram": 0,
+          "ram": 16384
+        }
+      }
+    }
+  },
+  "model_management": {
+    "allow_load": true,
+    "max_loaded_models": 3,
+    "approval_ttl_seconds": 120,
+    "allow_unload": true,
+    "vram_reserve_mb": 1024,
+    "ram_reserve_mb": 2048
   }
 }

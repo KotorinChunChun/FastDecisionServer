@@ -10,6 +10,7 @@ from unittest.mock import Mock, MagicMock, patch
 
 from tests.support import CONFIG, image_uri, request
 from fds.backend import JeffBackend
+from fds.management import ManagementError
 
 
 class BackendTests(unittest.TestCase):
@@ -20,9 +21,10 @@ class BackendTests(unittest.TestCase):
         self.config = copy.deepcopy(CONFIG)
         self.config["default_device"] = "auto"
         for name, entry in self.config["models"].items():
-            entry.update(backend="jeff", checkpoint=f"models/{name}")
+            entry.update(backend="jeff", checkpoint=f"models/{name}", memory_mb={"cpu": {"ram": 1000, "vram": 0}, "cuda": {"ram": 1000, "vram": 2000}})
             folder = self.root / entry["checkpoint"]
             folder.mkdir(parents=True)
+            (folder / 'model.safetensors').touch()
             (folder / "decision_config.json").write_text(json.dumps({"max_options": 64}), encoding="utf-8")
             (folder / ".fds-revision").write_text(entry["revision"], encoding="utf-8")
         self.torch = types.ModuleType("torch")
@@ -44,6 +46,7 @@ class BackendTests(unittest.TestCase):
         self.modules = patch.dict("sys.modules", {"torch": self.torch, "jeff": jeff, "jeff.models": models, "jeff.model": model})
         self.modules.start()
         self.backend = JeffBackend(self.root, self.config)
+        self.backend.manager.memory = lambda device: {'ram': 100000, 'vram': 100000}
 
     def tearDown(self):
         self.modules.stop()
@@ -74,7 +77,7 @@ class BackendTests(unittest.TestCase):
 
     def test_requested_cuda_does_not_silently_fall_back(self):
         self.torch.cuda.is_available.return_value = False
-        with self.assertRaisesRegex(RuntimeError, "CUDA"):
+        with self.assertRaisesRegex(ManagementError, "CUDA"):
             self.backend._load("text-model", "cuda")
         self.loader.assert_not_called()
 
@@ -90,10 +93,10 @@ class BackendTests(unittest.TestCase):
     def test_missing_or_wrong_revision_fails_before_model_load(self):
         revision = self.root / self.config["models"]["text-model"]["checkpoint"] / ".fds-revision"
         revision.unlink()
-        with self.assertRaisesRegex(RuntimeError, "revision"):
+        with self.assertRaisesRegex(ManagementError, "revision"):
             self.backend._load("text-model", "cpu")
         revision.write_text("wrong-revision", encoding="utf-8")
-        with self.assertRaisesRegex(RuntimeError, "revision"):
+        with self.assertRaisesRegex(ManagementError, "revision"):
             self.backend._load("text-model", "cpu")
         self.loader.assert_not_called()
 
@@ -135,6 +138,49 @@ class BackendTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "不正な確率"):
             self.backend.decide(request())
         self.answer.assert_not_called()
+
+
+
+    def test_cached_models_keep_their_own_option_limits(self):
+        self.backend._load("text-model", "cpu")
+        self.backend.limit = 2
+        self.backend._load("image-model", "cpu")
+        self.backend.limit = 10
+        with self.assertRaisesRegex(ValueError, "上限"):
+            self.backend.decide(request(questions={"kind": {"type": "choice", "criteria": {"a": "甲", "b": "乙", "c": "丙"}}}))
+        self.assertEqual(self.backend.loaded, ("text-model", "cpu"))
+        self.assertEqual(self.backend.limit, 2)
+        self.assertEqual(self.loader.call_count, 2)
+
+    def test_eval_failure_leaves_previous_cache_intact(self):
+        self.backend._load("text-model", "cpu")
+        previous = self.backend.model
+        broken = MagicMock()
+        broken.eval.side_effect = RuntimeError("模擬eval失敗")
+        self.loader.return_value = broken
+        with self.assertRaises(ManagementError) as error:
+            self.backend._load("image-model", "cpu")
+        self.assertEqual(error.exception.code, "model_load_failed")
+        self.assertIs(self.backend.model, previous)
+        self.assertEqual(self.backend.loaded, ("text-model", "cpu"))
+        self.assertEqual(len(self.backend.manager.entries), 1)
+
+    def test_installed_capabilities_distinguish_loaded_and_policy(self):
+        self.backend._load("text-model", "cpu")
+        self.backend.manager.policy["allow_load"] = False
+        listing = self.backend.capabilities()
+        row = next(row for row in listing["models"] if row["id"] == "text-model")
+        self.assertTrue(row["available"])
+        self.assertFalse(row["loadable"])
+        self.assertFalse(row["load_allowed"])
+        self.assertTrue(row["unload_allowed"])
+        self.assertEqual(row["loaded_devices"], ["cpu"])
+        self.assertEqual(row["status"]["value"], "ready")
+        self.assertIn("cpu", row["devices"])
+        self.backend.decide(request())
+        with self.assertRaises(ManagementError) as error:
+            self.backend._load("image-model", "cpu")
+        self.assertEqual(error.exception.code, "load_not_allowed")
 
 
 if __name__ == "__main__":

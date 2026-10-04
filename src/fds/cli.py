@@ -1,6 +1,7 @@
 """fds の起動・モデル導入・状態・管理停止。"""
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -30,6 +31,32 @@ def configuration(root):
         folder = (root / entry["checkpoint"]).resolve()
         if not folder.is_relative_to((root / "models").resolve()):
             raise ValueError("checkpointはプロジェクト内のmodels配下に配置してください。")
+
+    from .management import DEFAULT_POLICY
+    policy = value.get("model_management", {})
+    if not isinstance(policy, dict) or set(policy) - set(DEFAULT_POLICY):
+        raise ValueError("model_managementの設定が不正です。")
+    policy = DEFAULT_POLICY | policy
+    for key in ("allow_load", "allow_unload"):
+        if type(policy[key]) is not bool:
+            raise ValueError(f"{key}は真偽値で指定してください。")
+    for key, lower, upper in [("max_loaded_models", 1, 32), ("ram_reserve_mb", 0, 1048576),
+                               ("vram_reserve_mb", 0, 1048576), ("approval_ttl_seconds", 10, 600)]:
+        if type(policy[key]) is not int or not lower <= policy[key] <= upper:
+            raise ValueError(f"{key}は{lower}～{upper}の整数を指定してください。")
+    value["model_management"] = policy
+    for entry in value["models"].values():
+        estimates = entry.get("memory_mb", {})
+        if not isinstance(estimates, dict) or set(estimates) - {"cpu", "cuda"}:
+            raise ValueError("memory_mbのデバイス指定が不正です。")
+        for device, estimate in estimates.items():
+            if not isinstance(estimate, dict) or set(estimate) != {"ram", "vram"}:
+                raise ValueError("memory_mbにはramとvramを指定してください。")
+            if any(type(n) not in (int, float) or not math.isfinite(n) or not 0 <= n <= 1048576 for n in estimate.values()):
+                raise ValueError("メモリ見積は有限の非負MB値で指定してください。")
+            if estimate["ram"] <= 0 or (device == "cuda" and estimate["vram"] <= 0) or (device == "cpu" and estimate["vram"] != 0):
+                raise ValueError("モデルのRAM/VRAM見積が不正です。")
+
     return value
 
 

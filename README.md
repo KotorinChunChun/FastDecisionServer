@@ -50,6 +50,18 @@ DesktopAgent v0.17.0で6用途のJeff/Luna切替へ接続しました。合成�
 
 ## クライアント用の利用可否
 
-`GET /v1/models` は `installed`、`available`、`unavailable_reason` と、現在のサーバーで利用できる `devices` を返します。トップレベルにも `devices` と `capabilities_version: 1` を返します。未導入モデルは一覧に残し `available: false`、devicesは空配列です。GPUはサーバーのCUDA利用可否で判定し、クライアントPCのGPUとは無関係です。導入確認は設定・固定revision・重みファイルの存在によるもので、メモリ不足や破損ファイルまで成功を保証するものではありません。
+`GET /v1/models` は `installed`、`available`、`unavailable_reason` と、現在のサーバーで利用できる `devices` を返します。トップレベルにも `devices` と `capabilities_version: 2` を返します。未導入モデルは一覧に残し `available: false`、devicesは空配列です。GPUはサーバーのCUDA利用可否で判定し、クライアントPCのGPUとは無関係です。導入確認は設定・固定revision・重みファイルの存在によるもので、メモリ不足や破損ファイルまで成功を保証するものではありません。
 
-要求ごとのCPU/GPU切替に対応します。起動時のDeviceは既定値であり固定ではありません。未導入モデルや未対応デバイスは推論待ち列へ入れる前に422で返します。推論失敗はJSONのdetailに理由を返し、期限超過は504になります。
+要求ごとのCPU/GPU切替に対応します。起動時のDeviceは既定値であり固定ではありません。未導入モデルや未対応デバイスは422で返します。推論失敗はJSONのdetailに理由を返し、期限超過は504になります。
+
+## モデルの常駐管理（v0.2.0）
+
+導入済みモデルは `GET /models` または `GET /v1/models` で確認できます。`installed/available` は固定版の導入状況、`loadable` は導入済みでサーバーがロードを許可している状態です。`loaded_devices` は実際に常駐している CPU/GPU、`status.value` は ready/unloaded/loading/unloading/unavailable を表します。常駐とロード可能は別です。
+
+`POST /models/load` と `POST /models/unload` に `model`、`device`（auto/cpu/cuda）を送ります。モデル重みは取得しません。ロード済みの再利用、空きへの追加ロード、未常駐モデルのアンロードは確認不要です。既存モデルを解放する操作は常に HTTP 409 `approval_required` を返し、クライアントが対象を表示して承認後に token 付きで再申請します。`auto_unload: true` でも承認を省略しません。
+
+モデルとデバイスの組み合わせごとに常駐します。既定上限は3件、RAM余裕は2048MiB、VRAM余裕は1024MiBです。空き容量が不足した場合、使用が古い常駐モデルから解放候補にします。CPU/GPUの変更も、旧モデルを残せるなら確認不要、解放が必要なら承認対象です。メモリ見積や空き容量が不明ならロードを拒否し、OOMが発生しても無断で追加解放しません。
+
+サーバー設定 `model_management.allow_load/allow_unload` で許可を変更できます。ロード禁止でも既に常駐している組み合わせの推論は使えます。設定は次回起動時に反映します。クライアントの `auto_unload: false` は自動解放を禁止します。通常推論の暗黙ロードにも同じ許可と承認が適用されます。
+
+管理・推論は同じワーカーで直列実行します。期限切れや切断で応答を破棄しても処理が続く場合があるため、自動再送せず一覧と health で実状態を確認してください。承認 token は記録・保存しません。
