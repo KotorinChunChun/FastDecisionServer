@@ -38,6 +38,14 @@ class JeffBackend:
         return {'models':rows,'devices':(['auto'] if auto_supported else [])+server_devices,
                 'default_device':automatic,'capabilities_version':1}
 
+    def validate_request(self, request):
+        capabilities = self.capabilities()
+        model = next((m for m in capabilities['models'] if m['id'] == request.model), None)
+        if model is None or not model['available']:
+            raise ValueError(model['unavailable_reason'] if model else '未登録のモデルです。')
+        if request.device not in model['devices']:
+            raise ValueError('指定デバイスはサーバーで利用できません。対応デバイス: ' + ', '.join(model['devices']))
+
     def _load(self, name, requested_device):
         import torch
         from jeff.models import load_decision_model

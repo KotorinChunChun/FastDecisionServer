@@ -168,13 +168,19 @@ def create_app(config, backend, control_token="", shutdown=None):
         if body.images and not config["models"][body.model].get("images"):
             raise HTTPException(422, "このモデルは画像入力に対応していません。")
         try:
+            if hasattr(backend, "validate_request"):
+                await asyncio.to_thread(backend.validate_request, body)
             return await service.submit(body, request)
+        except HTTPException:
+            raise
         except ValueError as error:
             raise HTTPException(422, str(error)) from error
         except TimeoutError as error:
             raise HTTPException(504, str(error)) from error
         except (RuntimeError, OSError) as error:
             raise HTTPException(503, str(error)) from error
+        except Exception as error:
+            raise HTTPException(500, "推論に失敗しました: " + str(error)) from error
 
     @app.post("/admin/shutdown")
     async def stop(request: Request):

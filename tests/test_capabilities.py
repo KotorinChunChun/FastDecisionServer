@@ -17,6 +17,13 @@ class CapabilitiesTest(unittest.TestCase):
                 self.assertTrue(result['models'][0]['available'])
                 self.assertFalse(result['models'][1]['available'])
                 self.assertEqual(result['models'][1]['devices'],[])
+            from types import SimpleNamespace
+            with patch('torch.cuda.is_available',return_value=False):
+                with self.assertRaisesRegex(ValueError, "指定デバイス"):
+                    backend.validate_request(SimpleNamespace(model="ready", device="cuda"))
+                with self.assertRaisesRegex(ValueError, "未導入"):
+                    backend.validate_request(SimpleNamespace(model="missing", device="cpu"))
+                backend.validate_request(SimpleNamespace(model="ready", device="cpu"))
             with patch('torch.cuda.is_available',return_value=True):
                 self.assertIn('cuda',backend.capabilities()['models'][0]['devices'])
             (folder/'.fds-revision').write_text('old')

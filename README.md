@@ -51,3 +51,5 @@ DesktopAgent v0.17.0で6用途のJeff/Luna切替へ接続しました。合成�
 ## クライアント用の利用可否
 
 `GET /v1/models` は `installed`、`available`、`unavailable_reason` と、現在のサーバーで利用できる `devices` を返します。トップレベルにも `devices` と `capabilities_version: 1` を返します。未導入モデルは一覧に残し `available: false`、devicesは空配列です。GPUはサーバーのCUDA利用可否で判定し、クライアントPCのGPUとは無関係です。導入確認は設定・固定revision・重みファイルの存在によるもので、メモリ不足や破損ファイルまで成功を保証するものではありません。
+
+要求ごとのCPU/GPU切替に対応します。起動時のDeviceは既定値であり固定ではありません。未導入モデルや未対応デバイスは推論待ち列へ入れる前に422で返します。推論失敗はJSONのdetailに理由を返し、期限超過は504になります。
