@@ -21,7 +21,14 @@ if ($Command -eq 'start') {
     do {
         if ($process.HasExited) { throw "fds起動に失敗しました。終了コード=$($process.ExitCode)。runtime/server-$Port.err.logを確認してください。" }
         try { $health=Invoke-RestMethod "http://127.0.0.1:$Port/health" -TimeoutSec 1 } catch { $health=$null }
-        if ($health -and $health.pid -eq $process.Id) { $health; return }
+        if ($health -and $health.service -eq 'FastDecisionServer') {
+            $serverProcess=Get-CimInstance Win32_Process -Filter "ProcessId=$([int]$health.pid)"
+            if ($health.pid -eq $process.Id -or $serverProcess.ParentProcessId -eq $process.Id) {
+                $health.pid | Set-Content -LiteralPath "$runtime/server-$Port.pid"
+                $health
+                return
+            }
+        }
         Start-Sleep -Milliseconds 200
     } while ([DateTime]::UtcNow -lt $deadline)
     throw "fdsの起動確認が期限を超えました。PID=$($process.Id) を確認してください。自動再起動は行いません。"
