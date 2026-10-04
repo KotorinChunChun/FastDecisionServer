@@ -1,0 +1,3 @@
+[submodule "vendor/jeff"]
+	path = vendor/jeff
+	url = https://github.com/firelex/jeff.git

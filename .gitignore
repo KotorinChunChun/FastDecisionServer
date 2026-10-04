@@ -1,0 +1,13 @@
+.venv/
+.cache/
+models/
+config.local.json
+runtime/
+release/
+dev/temp/
+dev/private/
+dev/testing/output/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
