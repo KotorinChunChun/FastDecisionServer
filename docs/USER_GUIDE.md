@@ -24,6 +24,17 @@ pwsh -NoProfile -File .\dev\scripts\fds.ps1 -Command stop
 
 停止は新しい受付を閉じ、現在の計算が終わってから終了します。強制終了へ自動的には切り替えません。停止すると常駐実体は解放されますが、導入済みのモデルファイルは残ります。次の起動では既定モデルを準備し、停止前の全常駐構成を自動復元することはありません。
 
+## Windowsサインイン時の自動起動
+
+次のコマンドで現在のユーザーの自動起動を登録します。サインイン時に画面を出さず起動し、CUDAが利用可能ならGPUを使います。起動済みのfdsは再起動しません。サインイン前のWindowsサービスとしての起動ではありません。
+
+```powershell
+cd C:\develop\FastDecisionServer
+pwsh -NoProfile -File .\dev\scripts\autostart.ps1 -Command enable
+pwsh -NoProfile -File .\dev\scripts\autostart.ps1 -Command status
+```
+
+解除は同じスクリプトの `-Command disable` です。解除しても現在稼働中のfdsは停止しません。登録先は現在のユーザーの `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` の `FastDecisionServer` です。
 ## モデルの導入と選択
 
 登録済みモデルは [モデル一覧](http://127.0.0.1:8767/v1/models) で確認できます。既定のQwen3.5-2B以外を使う場合は、対象を指定して導入します。
