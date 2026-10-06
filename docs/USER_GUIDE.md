@@ -1,6 +1,10 @@
 # 利用ガイド
 
-FDS v0.2.2の利用方法です。[概要と初回起動](../README.md) / [API仕様](API.md) / [設定・環境構築](DEVELOPERS_GUIDE.md)
+FDS v0.3.0の利用方法です。[概要と初回起動](../README.md) / [API仕様](API.md) / [設定・環境構築](DEVELOPERS_GUIDE.md)
+
+## Cloudflare Clef
+
+クラウドモデルの追加設定は[認証入力・再起動・接続確認](CLOUDFLARE.md)を参照してください。`ready` はローカル常駐またはクラウド認証設定済みを示し、クラウドの実接続成功は保証しません。
 
 ## 起動・状態確認・停止
 
@@ -12,7 +16,7 @@ pwsh -NoProfile -File .\dev\scripts\fds.ps1 -Command start -Device auto
 pwsh -NoProfile -File .\dev\scripts\fds.ps1 -Command status
 ```
 
-`auto` はCUDAが利用可能ならGPU、それ以外はCPUを選びます。`cpu` はGPU版の環境でもCPUを使い、`cuda` はGPUを指定します。CUDAを利用できない場合、`cuda` 指定は失敗します。起動時の指定は既定の実行先で、要求ごとに変更できます。GPUの利用可否はFDSが動くPCで決まり、クライアントPCのGPUとは無関係です。
+Jeffの `auto` はCUDAが利用可能ならGPU、それ以外はCPUを選びます。`cpu` はGPU版の環境でもCPUを使い、`cuda` はGPUを指定します。CUDAを利用できない場合、`cuda` 指定は失敗します。起動時の指定は既定の実行先で、要求ごとに変更できます。GPUの利用可否はFDSが動くPCで決まり、クライアントPCのGPUとは無関係です。
 
 起動スクリプトの終了だけでなく、[health](http://127.0.0.1:8767/health) の `ready` を確認します。モデル未導入や準備失敗でもhealthは応答し、`error` で理由を確認できます。`loaded_models` は全常駐一覧、`active`・`queued` は実行中・待ち列の状態です。既に同じポートでFDSが起動していれば、startはその状態を表示し、設定の変更や再起動はしません。
 

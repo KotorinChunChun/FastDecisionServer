@@ -1,6 +1,6 @@
 # FastDecisionServer（fds）
 
-ローカルアプリから共用する判定サーバーです。短縮名は **fds**。Jeffモデルで真偽・選択・尺度を返し、対応モデルでは画像も入力できます。DesktopAgentやTestJeffとは独立して起動します。
+ローカルアプリから共用する判定サーバーです。短縮名は **fds**。JeffモデルとCloudflare Clefで真偽・選択・尺度を返し、対応モデルでは画像も入力できます。DesktopAgentやTestJeffとは独立して起動します。
 
 ## 起動
 
@@ -15,7 +15,7 @@ pwsh -NoProfile -File .\dev\scripts\fds.ps1 -Command start -Device cpu
 
 NVIDIA GPUを使う場合は、導入時と起動時の `-Device cpu` を `-Device cuda` に変更します。必要な環境と設定は[開発者ガイド](docs/DEVELOPERS_GUIDE.md)を参照してください。
 
-待受はこのPCの [127.0.0.1:8767](http://127.0.0.1:8767/health) です。`ready: true` がモデルの準備完了を示します。
+待受はこのPCの [127.0.0.1:8767](http://127.0.0.1:8767/health) です。`ready: true` はローカルモデル常駐またはクラウド認証設定済みを示します。クラウドの実接続確認は判定要求で行います。
 
 ```powershell
 pwsh -NoProfile -File .\dev\scripts\fds.ps1 -Command status
@@ -23,6 +23,10 @@ pwsh -NoProfile -File .\dev\scripts\fds.ps1 -Command stop
 ```
 
 停止は現在の計算が終わるまで待ちます。詳しい運用は[利用ガイド](docs/USER_GUIDE.md)にまとめています。
+
+## Cloudflare Clef
+
+クラウド接続にはアカウントIDとWorkers AI用APIトークンを設定します。[設定・起動・接続確認](docs/CLOUDFLARE.md)を参照してください。Jeffの既定動作は変わりません。
 
 ## 判定例
 

@@ -43,6 +43,7 @@ FastDecisionServerの短縮名は **fds**。DesktopAgent以外からも利用す
 |---|---|
 | 概要・最短の起動 | [README](README.md) |
 | 起動・停止、CPU/GPU、モデル管理、エラー時の確認 | [利用ガイド](docs/USER_GUIDE.md) |
+| Cloudflare認証・クラウド判定 | [Cloudflare Clefの設定](docs/CLOUDFLARE.md) |
 | 判定・管理API、入力制限、承認、常駐契約 | [API仕様](docs/API.md) |
 | 構築、設定、モデル追加、試験方法 | [開発者ガイド](docs/DEVELOPERS_GUIDE.md) |
 | 現行版と過去の要求・実装・測定記録 | [開発資料の目録](dev/README.md) |

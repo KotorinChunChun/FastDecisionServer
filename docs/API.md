@@ -1,6 +1,6 @@
 # API仕様
 
-対象は FastDecisionServer v0.2.2。利用の入口は [README](../README.md)、起動・停止やモデル保持の操作は [利用ガイド](USER_GUIDE.md)、サーバー設定とバックエンド追加は [開発者ガイド](DEVELOPERS_GUIDE.md) を参照する。
+対象は FastDecisionServer v0.3.0。利用の入口は [README](../README.md)、起動・停止やモデル保持の操作は [利用ガイド](USER_GUIDE.md)、サーバー設定とバックエンド追加は [開発者ガイド](DEVELOPERS_GUIDE.md) を参照する。
 
 ## 接続先と共通の契約
 
@@ -26,7 +26,8 @@
 | フィールド | 意味 |
 |---|---|
 | `service` / `alias` / `version` / `pid` | サービス名・略称・稼働版・プロセスID |
-| `ready` | 少なくとも1つ常駐モデルがあること。モデルの品質や全登録モデルの準備完了は保証しない |
+| `ready` | 少なくとも1つ常駐モデルがある、またはクラウド認証文字列が設定済みであること。モデルの品質や全登録モデルの準備完了は保証しない |
+| `cloud_configured` | クラウド認証文字列が形式上設定済み。実認証・接続の成功は保証しない |
 | `running` / `accepting` | 新しい要求を受付中か |
 | `error` | 直近の処理・準備失敗の理由。なければ `null` |
 | `active` / `queued` / `completed` | 実行中ジョブ数（0/1）・待ちジョブ数・正常終了した推論数 |
@@ -38,11 +39,11 @@
 | `default_model` / `default_device` | 稼働中の既定モデル・device |
 | `cpu_threads` / `text_batch_size` | 稼働サーバーの設定値。判定時の実効値・分割は判定応答の `execution` を参照 |
 
-モデル未導入などで準備に失敗してもhealthは応答し、常駐がなければ `ready: false` と `error` を返す。`active` と `operation` はモデル管理も含む実行状態で、`completed` は管理操作の回数ではない。
+モデル未導入などで準備に失敗してもhealthは応答し、常駐もクラウド認証設定もなければ `ready: false` と `error` を返す。`active` と `operation` はモデル管理も含む実行状態で、`completed` は管理操作の回数ではない。
 
 ### `GET /models` / `GET /v1/models`
 
-トップレベルは `object: "list"`、同内容の `data`・`models` 配列、`devices`、`default_device`、`capabilities_version: 2`、`loaded_models`、`model_management`、`generation`、`operation` を返す。`loaded_models` などの常駐情報はhealthと同じ意味。
+トップレベルは `object: "list"`、同内容の `data`・`models` 配列、`devices`、`default_device`、`capabilities_version: 3`、`loaded_models`、`model_management`、`generation`、`operation` を返す。`loaded_models` などの常駐情報はhealthと同じ意味。
 
 各モデルのフィールドは次のとおり。
 
@@ -58,7 +59,7 @@
 | `loaded_devices` | 実際に常駐している `cpu` / `cuda` の一覧 |
 | `status.value` | `ready` / `unloaded` / `loading` / `unloading` / `unavailable` |
 
-未導入モデルも登録一覧に残る。`available` はメモリ容量や重みの完全性まで確認する値ではない。GPU利用可否はサーバーのCUDA環境で判定し、クライアントPCのGPUとは無関係。トップレベルの `devices` はサーバーの利用可能deviceで、既定deviceを利用できない場合は `auto` を含めない。常駐済みなら `loadable: false` でも再利用できる。
+未導入モデルも登録一覧に残る。`available` はメモリ容量や重みの完全性まで確認する値ではない。GPU利用可否はサーバーのCUDA環境で判定し、クライアントPCのGPUとは無関係。トップレベルの `devices` はサーバーのローカル利用可能deviceで、既定deviceを利用できない場合は `auto` を含めない。常駐済みなら `loadable: false` でも再利用できる。
 
 ## 判定要求
 
@@ -67,7 +68,7 @@
 | フィールド | 既定・制約 |
 |---|---|
 | `model` | 省略時はサーバーの `default_model`。1～100文字の登録ID |
-| `device` | 既定 `auto`。`auto` / `cpu` / `cuda` |
+| `device` | 既定 `auto`。`auto` / `cpu` / `cuda` / `cloud`。モデルごとの制約は下記 |
 | `state` | 必須の文字列。最大24000文字 |
 | `questions` | 必須の「質問ID→質問」辞書、1～8件。IDは1～100文字 |
 | `images` | 既定は空配列。base64 data URL、最大4枚 |
@@ -76,7 +77,7 @@
 | `auto_unload` | 既定 `true`、真偽値。追加ロード時の解放検討を許すが、サーバーポリシーや承認を上書きしない |
 | `approval_token` | 既定 `null`。承認後だけ付ける20～256文字のtoken |
 
-`auto` はサーバーの `default_device` を参照し、それも `auto` ならCUDA利用可否で解決する。明示的なCPU指定はCPUで実行し、利用できないCUDA指定をCPUへ黙って変更しない。要求の全質問は同一モデル・実deviceで処理する。
+Jeffの `auto` はサーバーの `default_device` を参照し、それも `auto` ならCUDA利用可否で解決する。明示的なCPU指定はCPUで実行し、利用できないCUDA指定をCPUへ黙って変更しない。要求の全質問は同一モデル・実deviceで処理する。
 
 質問の `type` は必須、`instructions` は既定空文字で最大3000文字。`type` と `criteria` の契約は次のとおり。
 
@@ -94,7 +95,7 @@
 
 実際の画像形式とMIMEを照合して検証後、EXIFの向きを補正し、縦横とも1024px以内へ縦横比を保って縮小する。透明部分を白に合成し、RGBとしてモデルへ渡す。
 
-モデル入力は1質問8192トークンを上限とし、超えた本文を切り捨てず拒否する。短いテキストは `text_batch_size`（既定8）の範囲で同じ要求の質問をまとめる。複数質問のpadding込み `input_ids` が1024要素を超えたらforward前に質問グループを二分する。長文そのものを分割・省略する処理ではなく、1質問は8192トークンまで単独で処理できる。画像付き要求は常に1質問ずつ。質問順・IDと回答の対応を維持する。
+Jeffのモデル入力は1質問8192トークンを上限とし、超えた本文を切り捨てず拒否する。短いテキストは `text_batch_size`（既定8）の範囲で同じ要求の質問をまとめる。複数質問のpadding込み `input_ids` が1024要素を超えたらforward前に質問グループを二分する。長文そのものを分割・省略する処理ではなく、1質問は8192トークンまで単独で処理できる。画像付き要求は常に1質問ずつ。質問順・IDと回答の対応を維持する。
 
 ### 判定応答
 
@@ -114,6 +115,29 @@
 `noul` の回答は `type` と真である確率の `noul`。`choice` は `type`・`choice`（選択ID）・`confidence`・`probabilities`（選択ID→確率）。`score` は `type`・`score`（0始まりの尺度の期待値）・`confidence`・`probabilities`（尺度番号文字列→確率）・`legend`（尺度番号文字列→説明）を返す。
 
 GPUのバッチ形状によって浮動小数の確率差が生じることがある。逐次条件で比較する場合はサーバーの `text_batch_size` を1にする。モデルの出力が有限の確率でなければ失敗として扱う。
+
+## クラウドモデルの契約
+
+設定・起動・判定例は[Cloudflare Clefの設定](CLOUDFLARE.md)を参照する。`cloudflare-clef`・`cloudflare-clef-flash` は `auto` / `cloud` だけを受け付け、`auto` はローカルの既定deviceによらずcloudになる。Jeffにcloudは指定できない。質問IDは英数字・`_`・`.`・`-` の1～100文字。共通入力制限と画像正規化に加え、正規化PNGは1枚4MiB・合計8MiB、上流への要求は13MiB以内。上流のトークン制限による長文切捨てがあり得る。
+
+モデル一覧のクラウド行は `execution_location: "cloud"`、`management_supported: false`、`revision: null`、`installed: false`。`available` は認証設定の形式が有効なときtrue、`status.value` はconfigured、指定可能なdevicesはauto/cloudとなる。未設定時はunavailableと空devices。実接続やアカウント権限は判定要求で確認する。常駐一覧にクラウドは入らず、loadable/load_allowed/unload_allowedはfalse。クライアントはinstalledだけで判定可否を決めず、各モデルのavailable・devices・management_supportedを参照する。
+
+判定応答は `provider: "cloudflare"`、`device: "cloud"`、`revision: null`、`upstream_model: "@cf/cloudflare/clef"` またはclef-flash。usageは上流値、load_msは0、inference_msは通信と応答検証を含む。`execution` は `{"mode":"cloud","timing_scope":"upstream_round_trip"}` で、ローカルのbatch_sizes/cpu_threads/managementは含めない。answersは共通形式を検証して返す。
+
+クラウドのロード・アンロードは422 `cloud_management_unsupported`。auto_unloadは使わず、approval_token付き要求は409 `approval_invalid`。Jeffの常駐・generationを変更しない。公式APIだけに送信し、リダイレクト・自動再送・別モデルへのフォールバックは行わない。通信中は同じ単一ワーカーを占有し、応答取消後も通信処理が終了するまで枠を保持する。通信が終了してもCloudflare側の計算停止は保証しない。
+
+クラウドエラーは `error: {code,type,message}` と `detail: {code,message}`、typeはprovider_error。外部のエラー本文や認証情報を返さない。
+
+| code | HTTP | 意味 |
+|---|---|---|
+| cloudflare_not_configured | 503 | 認証環境変数が未設定・形式不正 |
+| cloudflare_auth_failed | 503 | 上流401/403。認証・Workers AI権限を確認 |
+| cloudflare_rate_limited | 503 | 上流429。上限・混雑 |
+| cloudflare_request_failed | 502 | その他の上流HTTP失敗 |
+| cloudflare_connection_failed | 502 | 通信失敗 |
+| cloudflare_invalid_response | 502 | 上流応答の形式・値・サイズが不正 |
+| cloudflare_timeout | 504 | 上流通信の期限超過。FDS全体期限は通常の504の場合もある |
+| cloudflare_input_invalid / device_unavailable | 422 | 非対応入力・device |
 
 ## 待ち列・期限・計測
 
@@ -207,7 +231,7 @@ CPUはRAM、GPUはVRAMに加えてロード時などのRAMも使う。モデル�
 | 503 | 推論・ロード失敗、メモリ情報取得不能、停止中 |
 | 504 | 待ち時間を含む処理期限超過 |
 
-管理エラーは `error: {code,type,message}` と `detail: {code,message,approval?}` を返し、`type` は `model_management_error`。その他のエラーは `detail` に理由を返す。入力スキーマ違反の `detail` は `loc`・`msg`・`type` の配列で、入力値自体は含めない。
+管理エラーは `error: {code,type,message}` と `detail: {code,message,approval?}` を返し、`type` は `model_management_error`。クラウド以外のその他のエラーは `detail` に理由を返す。入力スキーマ違反の `detail` は `loc`・`msg`・`type` の配列で、入力値自体は含めない。
 
 | `code` | HTTP | 意味 |
 |---|---|---|

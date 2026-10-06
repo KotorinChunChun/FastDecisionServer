@@ -1,6 +1,6 @@
 # 開発者ガイド
 
-対象は FastDecisionServer v0.2.2。環境構築、設定、モデル追加、検証方法を記載する。利用の入口は [README](../README.md)、起動・停止と日常操作は [利用ガイド](USER_GUIDE.md)、HTTPの契約は [API仕様](API.md) を参照する。
+対象は FastDecisionServer v0.3.0。環境構築、設定、モデル追加、検証方法を記載する。利用の入口は [README](../README.md)、起動・停止と日常操作は [利用ガイド](USER_GUIDE.md)、HTTPの契約は [API仕様](API.md) を参照する。
 
 ## 環境構築
 
@@ -46,9 +46,9 @@ pwsh -NoProfile -File .\dev\scripts\setup.ps1 -Device cpu
 | `text_batch_size` | `8` | 整数1～8。同じ要求内で一緒に推論するテキスト質問数 |
 | `queue_size` | `16` | 整数1～256。実行待ち要求の上限 |
 
-`auto` は要求の実行時に既定deviceを参照し、それも `auto` ならサーバーのCUDA利用可否で `cuda` または `cpu` に解決する。明示した `cpu` をGPUへ変更せず、利用不能な `cuda` 指定は拒否する。
+Jeffの `auto` は要求の実行時に既定deviceを参照し、それも `auto` ならサーバーのCUDA利用可否で `cuda` または `cpu` に解決する。明示した `cpu` をGPUへ変更せず、利用不能な `cuda` 指定は拒否する。
 
-テキストの複数質問はpadding込みの `input_ids` が1024要素を超えるとforward前に質問グループを二分する。本文を切断・省略しない。1質問は8192トークンまでで、画像付き要求は常に1質問ずつ処理する。`text_batch_size: 1` で逐次方式にできる。複数のHTTP要求をまとめる設定ではなく、単一ワーカーと取消後の実処理保持は維持する。実際の分割数は判定応答の `execution.batch_sizes` で確認する。
+Jeffのテキストの複数質問はpadding込みの `input_ids` が1024要素を超えるとforward前に質問グループを二分する。本文を切断・省略しない。1質問は8192トークンまでで、画像付き要求は常に1質問ずつ処理する。`text_batch_size: 1` で逐次方式にできる。複数のHTTP要求をまとめる設定ではなく、単一ワーカーと取消後の実処理保持は維持する。実際の分割数は判定応答の `execution.batch_sizes` で確認する。
 
 ### モデル管理設定
 
@@ -84,6 +84,12 @@ pwsh -NoProfile -File .\dev\scripts\setup.ps1 -Device cpu
 
 空き容量はWindowsの `GlobalMemoryStatusEx` とCUDAの `mem_get_info` で取得し、見積と予約余裕を合わせて検査する。空き取得不能時は架空の容量で続行しない。見積は成功保証ではなく、常駐枠を増やしてもRAM・VRAM検査は省略しない。承認して解放した後も再検査し、不足やロード失敗を理由に承認外のモデルを追加解放しない。
 
+### Cloudflare設定
+
+`cloudflare` の `account_id_env` / `api_token_env` は認証情報を格納する環境変数の名前。既定は `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_AUTH_TOKEN`。値自体は設定ファイルへ書かない。未知のキーや任意接続先は受け付けない。
+
+クラウドのモデル行には `backend: "cloudflare"`、name、`cloudflare_model: "clef"` または `"clef-flash"`、imagesだけを指定する。ローカルのrevision/checkpoint/memory_mbは付けない。設定は[config.json](../config.json)、認証の対話入力と再起動は[Cloudflare Clefの設定](CLOUDFLARE.md)を参照する。既定モデルをクラウドにした起動は認証形式の確認だけを行い、上流推論を実行しない。
+
 ## モデルとバックエンド
 
 Jeff submoduleの固定revisionは `d0173b4ee317a46dee031421b713f3fc5f868cfe`。`git submodule update --init --recursive` で再現する。モデル重みは設定の `repo`・`revision` から `fds download --model <id>` で取得する。HTTPのロード操作は重みを取得しない。
@@ -93,8 +99,12 @@ Jeff submoduleの固定revisionは `d0173b4ee317a46dee031421b713f3fc5f868cfe`。
 | `jeff-qwen-2b` | Jeff Qwen3.5-2B（既定） | テキスト・画像 |
 | `jeff-qwen-0.8b` | Jeff Qwen3.5-0.8B | テキスト・画像 |
 | `jeff-gemma-e2b` | Jeff Gemma4 E2B | テキスト |
+| `cloudflare-clef` | Cloudflare Clef（クラウド） | テキスト・画像 |
+| `cloudflare-clef-flash` | Cloudflare Clef-Flash（クラウド） | テキスト・画像 |
 
-各モデルの固定版・保存先は [config.json](../config.json) を参照する。`decision_config.json`、重みファイル、設定のrevisionに一致する `.fds-revision` を確認してからロードする。markerは導入元revisionの記録であり、全重みの署名・改ざん検証ではない。導入判定はメモリ容量やファイルの完全性まで保証しない。
+Jeffモデルの固定版・保存先は [config.json](../config.json) を参照する。`decision_config.json`、重みファイル、設定のrevisionに一致する `.fds-revision` を確認してからロードする。markerは導入元revisionの記録であり、全重みの署名・改ざん検証ではない。導入判定はメモリ容量やファイルの完全性まで保証しない。
+
+`routing.py` がモデル設定でJeffとCloudflareを振り分ける。`cloudflare.py` はhttpxで公式APIに接続し、模擬試験ではMockTransportを注入する。実認証・課金・品質の確認は模擬試験に含まない。
 
 別のバックエンドを接続するときは `warmup()`、`decide(DecisionRequest)`、`loaded` を提供し、CLIの生成箇所へ接続する。常駐管理を実装する場合は `manage(action, ModelOperation)`・`status()`・`capabilities()`・要求の事前検証もJeff実装を参照する。HTTP、待ち列、エラー、取消の契約は [API仕様](API.md) を維持する。
 
