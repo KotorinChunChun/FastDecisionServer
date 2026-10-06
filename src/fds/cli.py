@@ -27,12 +27,30 @@ def configuration(root):
     if value["default_model"] not in value["models"]:
         raise ValueError("既定モデルが未登録です。")
     for name, entry in value["models"].items():
-        if not re.fullmatch(r"[a-zA-Z0-9_.-]{1,100}", name) or not re.fullmatch(r"[a-fA-F0-9]{40}", entry["revision"]):
+        if not re.fullmatch(r"[a-zA-Z0-9_.-]{1,100}", name):
+            raise ValueError("モデルIDが不正です。")
+        if entry.get("backend") == "cloudflare":
+            from .cloudflare import CLOUDFLARE_MODELS
+            if (set(entry) - {"backend", "name", "cloudflare_model", "images"}
+                    or entry.get("cloudflare_model") not in CLOUDFLARE_MODELS
+                    or not isinstance(entry.get("name"), str) or not entry["name"]
+                    or type(entry.get("images")) is not bool):
+                raise ValueError("Cloudflareモデルの設定が不正です。")
+            continue
+        if not re.fullmatch(r"[a-fA-F0-9]{40}", entry["revision"]):
             raise ValueError("モデルIDまたは固定revisionが不正です。")
         folder = (root / entry["checkpoint"]).resolve()
         if not folder.is_relative_to((root / "models").resolve()):
             raise ValueError("checkpointはプロジェクト内のmodels配下に配置してください。")
 
+    from .cloudflare import DEFAULT_CLOUDFLARE
+    cloud = value.get("cloudflare", {})
+    if not isinstance(cloud, dict) or set(cloud) - set(DEFAULT_CLOUDFLARE):
+        raise ValueError("cloudflareには認証用環境変数の名前だけを設定してください。")
+    cloud = DEFAULT_CLOUDFLARE | cloud
+    if any(not isinstance(v, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", v) for v in cloud.values()):
+        raise ValueError("Cloudflareの環境変数名が不正です。")
+    value["cloudflare"] = cloud
     from .management import DEFAULT_POLICY
     policy = value.get("model_management", {})
     if not isinstance(policy, dict) or set(policy) - set(DEFAULT_POLICY):
@@ -83,8 +101,10 @@ def main():
         config["default_model"] = args.model
     address = f"http://127.0.0.1:{config['port']}"
     if args.command == "download":
-        from huggingface_hub import snapshot_download
         entry = config["models"][config["default_model"]]
+        if entry.get("backend") == "cloudflare":
+            parser.error("クラウドモデルのダウンロードは不要です。認証用環境変数を設定してください。")
+        from huggingface_hub import snapshot_download
         folder = root / entry["checkpoint"]
         snapshot_download(entry["repo"], revision=entry["revision"], local_dir=str(folder))
         (folder / ".fds-revision").write_text(entry["revision"], encoding="utf-8")
@@ -98,7 +118,7 @@ def main():
             print(response.read().decode())
     else:
         import uvicorn
-        from .backend import JeffBackend
+        from .routing import FdsBackend
         from .server import create_app
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -114,7 +134,7 @@ def main():
         runtime = root / "runtime"
         runtime.mkdir(exist_ok=True)
         token = secrets.token_urlsafe(32)
-        app = create_app(config, JeffBackend(root, config), token, lambda: setattr(server, "should_exit", True))
+        app = create_app(config, FdsBackend(root, config), token, lambda: setattr(server, "should_exit", True))
         server = uvicorn.Server(uvicorn.Config(app, host=config["host"], port=config["port"], access_log=False))
         token_file = runtime / f"control-{config['port']}.token"
         try:

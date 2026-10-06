@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError
 
 from .contracts import DecisionRequest, ModelOperation
 from .management import ManagementError
+from .cloudflare import CloudflareError
 from . import __version__
 
 
@@ -163,11 +164,16 @@ def create_app(config, backend, control_token="", shutdown=None):
     async def management_error(request, error):
         return JSONResponse(error.response(), status_code=error.status)
 
+    @app.exception_handler(CloudflareError)
+    async def cloudflare_error(request, error):
+        return JSONResponse(error.response(), status_code=error.status)
+
     @app.get("/health")
     async def health():
         state = backend.status() if hasattr(backend, "status") else {}
         return {"service": "FastDecisionServer", "alias": "fds", "version": __version__,
                 "ready": state.get("ready", service.ready), "running": service.accepting,
+                "cloud_configured": state.get("cloud_configured", False),
                 "error": service.error or state.get("error"), "active": service.active, "queued": service.queue.qsize(),
                 "completed": service.completed, "loaded": state.get("loaded", backend.loaded), "pid": os.getpid(),
                 "loaded_models": state.get("loaded_models", []), "generation": state.get("generation", 0),
@@ -191,7 +197,7 @@ def create_app(config, backend, control_token="", shutdown=None):
     async def execute(body, request, action="inference"):
         try:
             return await service.submit(body, request, action)
-        except (HTTPException, ManagementError):
+        except (HTTPException, ManagementError, CloudflareError):
             raise
         except ValueError as error:
             raise HTTPException(422, str(error)) from error

@@ -7,6 +7,18 @@
   "text_batch_size": 8,
   "queue_size": 16,
   "models": {
+    "cloudflare-clef": {
+      "backend": "cloudflare",
+      "name": "Cloudflare Clef",
+      "cloudflare_model": "clef",
+      "images": true
+    },
+    "cloudflare-clef-flash": {
+      "backend": "cloudflare",
+      "name": "Cloudflare Clef-Flash",
+      "cloudflare_model": "clef-flash",
+      "images": true
+    },
     "jeff-qwen-2b": {
       "backend": "jeff",
       "name": "Jeff Qwen3.5-2B",
@@ -61,6 +73,10 @@
         }
       }
     }
+  },
+  "cloudflare": {
+    "account_id_env": "CLOUDFLARE_ACCOUNT_ID",
+    "api_token_env": "CLOUDFLARE_AUTH_TOKEN"
   },
   "model_management": {
     "allow_load": true,
